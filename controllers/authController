@@ -1,15 +1,20 @@
-const bcrypt = require('bcryptjs');
-const Joi = require('joi');
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+// Importamos las librerías y modelos necesarios
+const bcrypt = require('bcryptjs'); // Para el hash de contraseñas
+const Joi = require('joi'); // Para la validación de datos
+const User = require('../models/User'); // Modelo de usuario
+const jwt = require('jsonwebtoken'); // Para generar tokens JWT
 
+// Esquema de validación para el registro de usuarios
 const registerSchema = Joi.object({
-  username: Joi.string().min(3).max(50).required(),
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
-  .required()
+  username: Joi.string().min(3).max(50).required(), // Nombre de usuario (mínimo 3 caracteres)
+  email: Joi.string().email().required(), // Correo electrónico válido
+  password: Joi.string()
+    .min(8) // Contraseña con al menos 8 caracteres
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
+    .required() // Requerida y debe cumplir ciertos criterios (mayúsculas, minúsculas, números, caracteres especiales)
 });
 
+// Controlador para registrar un nuevo usuario
 exports.register = async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
@@ -23,7 +28,7 @@ exports.register = async (req, res) => {
     user = new User({
       username,
       email,
-      password: await bcrypt.hash(password, 10)
+      password: await bcrypt.hash(password, 10) // Hash de la contraseña antes de almacenarla
     });
 
     await user.save();
@@ -33,11 +38,13 @@ exports.register = async (req, res) => {
   }
 };
 
+// Esquema de validación para el inicio de sesión
 const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(6).required()
+  email: Joi.string().email().required(), // Correo electrónico válido
+  password: Joi.string().min(8).required() // Contraseña con al menos 8 caracteres
 });
 
+// Controlador para el inicio de sesión
 exports.login = async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
@@ -51,6 +58,7 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: 'Credenciales inválidas' });
 
+    // Generamos un token JWT con el ID del usuario
     const token = jwt.sign({ userId: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
 
     res.status(200).json({ mensaje: 'Inicio de sesión exitoso', token });
@@ -59,12 +67,14 @@ exports.login = async (req, res) => {
   }
 };
 
+// Esquema de validación para actualizar datos de usuario
 const updateUserSchema = Joi.object({
-  username: Joi.string().min(3).max(50),
-  email: Joi.string().email(),
-  password: Joi.string().min(6)
+  username: Joi.string().min(3).max(50), // Nuevo nombre de usuario (opcional)
+  email: Joi.string().email(), // Nuevo correo electrónico (opcional)
+  password: Joi.string().min(6) // Nueva contraseña (opcional)
 });
 
+// Controlador para actualizar datos de usuario
 exports.updateUser = async (req, res) => {
   const { error } = updateUserSchema.validate(req.body);
   if (error) return res.status(400).json({ error: error.details[0].message });
@@ -73,7 +83,7 @@ exports.updateUser = async (req, res) => {
 
   try {
     if (updates.password) {
-      updates.password = await bcrypt.hash(updates.password, 10);
+      updates.password = await bcrypt.hash(updates.password, 10); // Hash de la nueva contraseña
     }
 
     const user = await User.findByIdAndUpdate(req.user.userId, updates, { new: true });
